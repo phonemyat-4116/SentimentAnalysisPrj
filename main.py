@@ -21,7 +21,7 @@ def process_uploaded_file(uploaded_file):
     df = pd.read_csv(uploaded_file)
     
     # Determine which column to use for sentiment analysis
-    valid_columns = ['Feedback', 'Review', 'Text']
+    valid_columns = ['Feedback', 'Review', 'Textgi']
     selected_column = next((col for col in valid_columns if col in df.columns), None)
     
     if not selected_column:
