@@ -30,19 +30,22 @@ def process_uploaded_file(uploaded_file):
     
     # Apply sentiment analysis
     df[['positive', 'negative', 'neutral', 'compound']] = df[selected_column].apply(lambda text: pd.Series(analyze_sentiment(str(text))))
+    
+    # Categorize sentiment
+    df['Sentiment'] = df.apply(lambda row: "Positive" if  row['compound'] > 0.05 
+                               else "Negative" if row['compound']  < -0.05 else "Neutral", axis=1)
     return df
 
 def plot_sentiment_charts(df):
     """Plot sentiment distribution as both a pie chart and a bar chart."""
-    sentiment_counts = {
-        'Positive': (df['positive'] > df[['negative', 'neutral']].max(axis=1)).sum(),
-        'Negative': (df['negative'] > df[['positive', 'neutral']].max(axis=1)).sum(),
-        'Neutral': (df['neutral'] > df[['positive', 'negative']].max(axis=1)).sum()
-    }
+    sentiment_counts = df['Sentiment'].value_counts()
     
-    labels = list(sentiment_counts.keys())
-    sizes = list(sentiment_counts.values())
-    colors = ['#3bed68', '#ed184d', '#1776eb']
+    labels = sentiment_counts.index.tolist()
+    sizes = sentiment_counts.values.tolist()
+    colors = {'positive': '#3bed68', 'negative': '#ed184d', 'neutral': '#1776eb'}
+    
+    # Convert labels to lowercase to match the keys in the colors dictionary
+    color_list = [colors[label.lower()] for label in labels]  # Make label lowercase
     
     # Create layout for two charts
     col1, col2 = st.columns(2)
@@ -50,20 +53,20 @@ def plot_sentiment_charts(df):
     # Pie Chart
     with col1:
         plt.figure(figsize=(5, 5))
-        plt.pie(sizes, labels=labels, autopct='%1.1f%%', colors=colors, startangle=140)
+        plt.pie(sizes, labels=labels, autopct='%1.1f%%', colors=color_list, startangle=140)
         plt.title('Sentiment Distribution')
         st.pyplot(plt)
     
     # Bar Chart
     with col2:
         plt.figure(figsize=(4.5, 5))
-        sns.barplot(x=labels, y=sizes, palette=colors)
+        sns.barplot(x=labels, y=sizes, palette=color_list)
         plt.ylabel("Count")
         plt.title("Sentiment Distribution")
         st.pyplot(plt)
         
     # Summary Text
-    dominant_sentiment = max(sentiment_counts, key=sentiment_counts.get)
+    dominant_sentiment = sentiment_counts.idxmax()  # Use idxmax() to get the dominant sentiment
     st.write(f"### Summary: The overall sentiment of the data is **{dominant_sentiment}**.")
 
 # Streamlit UI
@@ -81,7 +84,14 @@ with tabs[0]:
         df_result = process_uploaded_file(uploaded_file)
         if df_result is not None:
             st.write("### Sentiment Analysis Results")
-            st.dataframe(df_result)
+            
+            # Display tables for each sentiment category
+            for sentiment in ['Positive', 'Negative', 'Neutral']:
+                filtered_df = df_result[df_result['Sentiment'] == sentiment][['Review', 'Sentiment']]
+                if not filtered_df.empty:
+                    st.write(f"### {sentiment} Reviews ({len(filtered_df)} total)")
+                    st.dataframe(filtered_df.reset_index(drop=True))
+                    
             plot_sentiment_charts(df_result)
 
 # Part 2: Text Input Sentiment Analysis
@@ -109,6 +119,12 @@ with tabs[1]:
             sentiment_bar("Negative", result['neg'], "#ed187b")
             sentiment_bar("Neutral", result['neu'], "#1776eb")
             sentiment_bar("Positive", result['pos'], "#3bed68")
+            
+            # Displaying compound score
+            compound_score = result['compound']
+            sentiment_label = "Positive" if compound_score > 0.05 else "Negative" if compound_score < -0.05 else "Neutral"
+            st.write(f"Compound Score : {compound_score:.4f}")
+            st.write(f"### Overall Sentiment : **{sentiment_label}**")
         else:
             st.warning("Please enter some text before calculating.")
 
